@@ -372,6 +372,7 @@ The build plan this repository implements lives in `docs/`:
 * `05-FEATURE-BACKLOG.md` — MoSCoW backlog, non-goals
 * `06-MASTER-SECURITY-SKILL-ARCHITECTURE.md` — offensive skill vision (authorized targets)
 * `07-OFFENSIVE-SKILL-IMPLEMENTATION-PLAN.md` — what is built, module map, phases, honest non-goals
+* `08-HACHIMAN-2.0-ARCHITECTURE.md` — repository audit + universal control-plane plan (Hachiman 2.0)
 
 ---
 
