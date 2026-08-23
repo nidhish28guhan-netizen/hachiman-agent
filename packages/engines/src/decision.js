@@ -81,7 +81,7 @@ export async function evaluateRequest(deps, req) {
 
   // ---- 3) TOOL LEGITIMACY (registry, or adapter-supplied metadata for 2.0 planes) ----
   let toolRow = null, toolMeta = {}, knownViaAdapter = false;
-  if (deps.toolLookup) toolRow = deps.toolLookup(req.mcpId, req.toolId);
+  if (deps.toolLookup && req.mcpId != null) toolRow = deps.toolLookup(req.mcpId, req.toolId);
   if (toolRow) try { toolMeta = JSON.parse(toolRow.riskMeta || '{}'); } catch {}
   else if (deps.resourceMeta && req.resource) {
     try { const m = deps.resourceMeta(req.resource); if (m && typeof m === 'object') { toolMeta = m; knownViaAdapter = true; } } catch {}

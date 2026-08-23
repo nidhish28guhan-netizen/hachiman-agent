@@ -43,12 +43,17 @@ test('universalizeRequest: string key, mcp fill-in, api/shell synthesis', () => 
   const api = universalizeRequest({ subject: 'agent:svc', resource: { type: 'api', id: 'billing', attrs: { path: '/v1/charge' } }, action: 'POST', params: {} });
   assert.equal(api.agentId, 'agent:svc');
   assert.equal(api.toolId, 'api.POST');
-  assert.equal(api.capability, 'api.POST:/v1/charge');
-  assert.equal(api.gateResource, 'api:billing');
+  assert.equal(api.capability, 'api.POST');
+  assert.equal(api.gateResource, 'api:billing:/v1/charge');
 
   const sh = universalizeRequest({ resource: { type: 'shell', id: 'workstation' }, action: 'exec', params: { command: 'ls' } });
   assert.equal(sh.toolId, 'shell.exec');
-  assert.match(sh.capability, /^shell\.exec/);
+  assert.equal(sh.capability, 'shell.exec');
+  assert.equal(sh.gateResource, 'shell:workstation');
+
+  const k8 = universalizeRequest({ resource: { type: 'k8s', id: 'billing-pod', attrs: { namespace: 'prod', operation: 'admit' } }, action: 'CREATE', params: {} });
+  assert.equal(k8.capability, 'k8s.admit');
+  assert.equal(k8.gateResource, 'k8s:prod/billing-pod');
 });
 
 test('adapter registry: validation, duplicates, lookup', () => {
@@ -143,5 +148,72 @@ test('fail-closed: non-MCP resource without grants is denied at the hard gate', 
     });
     assert.notEqual(v.decision, 'ALLOW');
     assert.ok(v.reasons.some((r) => r.startsWith('authorization:denied')));
+  } finally { await node.stop(); }
+});
+
+test('P3: adapter-supplied metadata makes a non-MCP resource registry-known', async () => {
+  const node = base();
+  try {
+    await node.start();
+    node.adapters.register({
+      id: 'demo-db', protocol: 'demo', resourceTypes: ['db'],
+      toDecisionRequest: () => ({}),
+      metadata: () => ({ sideEffectRisk: 10, egressCapable: false }),
+    });
+    node.allowAgent('db-user', 'db:ledger');
+    node.authz.grant({ subject: 'agent:db-user', capability: 'db.query', resource: 'db:ledger', grantedBy: 'test' });
+    const deps = node.engineDepsFor('demo-db');
+    deps.cacheEnabled = false;
+    const v = await evaluateRequest(deps, {
+      agentId: 'agent:db-user',
+      resource: { type: 'db', id: 'ledger' }, action: 'query', params: { sql: 'SELECT 1' },
+    });
+    assert.ok(!v.reasons.includes('tool:unknown'), 'adapter metadata must register the resource as known');
+
+    // without metadata: same request via a metadata-less adapter stays tool:unknown
+    const deps2 = node.engineDepsFor('mcp'); deps2.cacheEnabled = false;
+    const v2 = await evaluateRequest(deps2, {
+      agentId: 'agent:db-user',
+      resource: { type: 'db', id: 'ledger' }, action: 'query', params: { sql: 'SELECT 1' },
+    });
+    assert.ok(v2.reasons.includes('tool:unknown'));
+  } finally { await node.stop(); }
+});
+
+test('P3: policy predicate resourceType forces decisions (shell plane example)', async () => {
+  const node = base();
+  try {
+    await node.start();
+    node.policyEngine.loadPack({
+      id: 'custom-shell', version: 1,
+      thresholds: { risk: { low: 25, medium: 55, high: 75, critical: 90 }, confidenceFloor: 80 },
+      rules: [{ id: 'no-shell-exec', when: { resourceType: 'shell', action: 'exec' }, then: { decision: 'BLOCK', riskFloor: 85, reason: 'shell exec disabled by policy' } }],
+    });
+    node.config.policyPacks.push('custom-shell');
+    // Adapter metadata makes the shell resource registry-known, so the default
+    // pack's deny-unregistered-tool rule does not fire — isolating the 2.0 predicate.
+    node.adapters.register({
+      id: 'shell-ws', protocol: 'shell', resourceTypes: ['shell'],
+      toDecisionRequest: () => ({}), metadata: () => ({}),
+    });
+    const deps = node.engineDepsFor('shell-ws');
+    deps.cacheEnabled = false;
+    // Grant the capability so the request PASSES the hard authz gate — policy
+    // must then be seen to FORCE the block (strictest wins even over a grant).
+    node.identity.register('agent', 'ws-operator');
+    node.authz.grant({ subject: 'agent:ws-operator', capability: 'shell.exec', resource: 'shell:ws-1', grantedBy: 'test' });
+    const v = await evaluateRequest(deps, {
+      agentId: 'agent:ws-operator',
+      resource: { type: 'shell', id: 'ws-1', attrs: {} }, action: 'exec', params: { command: 'whoami' },
+    });
+    assert.equal(v.decision, 'BLOCK');
+    assert.ok(v.reasons.includes('policy:no-shell-exec'));
+    assert.ok(v.policyRefs.some((r) => r.startsWith('custom-shell:')));
+    // MCP traffic is untouched by shell-scoped rules
+    node.allowAgent('m2', 'notes');
+    const v2 = await evaluateRequest(deps, {
+      agentId: 'agent:m2', mcpId: 'notes', toolId: 'notes.create', action: 'tools/call', params: { title: 't' },
+    });
+    assert.ok(!v2.reasons.includes('policy:no-shell-exec'));
   } finally { await node.stop(); }
 });

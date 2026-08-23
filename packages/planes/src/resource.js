@@ -47,16 +47,23 @@ export function universalizeRequest(req) {
     if (!out.toolId) out.toolId = res.attrs.tool || (out.action && out.action !== 'tools/call' ? out.action : undefined);
   } else if (res.type === 'api') {
     if (!out.toolId) out.toolId = `api.${String(out.action || 'REQUEST').toUpperCase()}`;
-    if (!out.capability) out.capability = `api.${String(out.action || 'REQUEST').toUpperCase()}${res.attrs.path ? ':' + res.attrs.path : ':*'}`;
+    if (!out.capability) out.capability = `api.${String(out.action || 'REQUEST').toUpperCase()}`;
   } else if (res.type === 'shell') {
     if (!out.toolId) out.toolId = 'shell.exec';
-    if (!out.capability) out.capability = `shell.exec${res.attrs.command ? ':' + res.attrs.command : ':*'}`;
+    if (!out.capability) out.capability = 'shell.exec';
   } else if (res.type === 'k8s') {
     if (!out.toolId) out.toolId = `k8s.${res.attrs.operation || 'admit'}`;
-    if (!out.capability) out.capability = `k8s.${res.attrs.operation || 'admit'}:*`;
+    if (!out.capability) out.capability = `k8s.${res.attrs.operation || 'admit'}`;
   }
   if (!out.capability && res.type !== 'mcp') out.capability = `${res.type}.${out.action || 'act'}`;
-  out.gateResource = out.gateResource ?? (res.type === 'mcp' ? res.id : res.key);
+  // Capability is the BARE VERB; fine-grained scope rides the RESOURCE field
+  // (wildcard-capable: 'api:billing:*', 'k8s:prod/*'), never the capability.
+  if (out.gateResource == null) {
+    if (res.type === 'mcp') out.gateResource = res.id;
+    else if (res.type === 'api') out.gateResource = `api:${res.id}${res.attrs.path ? ':' + res.attrs.path : ''}`;
+    else if (res.type === 'k8s') out.gateResource = `k8s:${res.attrs.namespace || 'default'}/${res.id}`;
+    else out.gateResource = res.key;
+  }
   if (!out.agentId && req.subject) out.agentId = req.subject;
   out.ctx = { ...(out.ctx || {}), resourceType: res.type, adapterId: req.adapterId || out.ctx?.adapterId };
   return out;
