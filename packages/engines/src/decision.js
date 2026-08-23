@@ -7,6 +7,7 @@ import { detectInjection } from './injection.js';
 import { computeRisk } from './risk.js';
 import * as trust from './trust.js';
 import { validateSemanticOutput, buildCompactContext } from './semantic.js';
+import { universalizeRequest, capabilityOf } from '../../planes/src/resource.js';
 
 /**
  * deps: { storage, bus, policy:{policySet}, authz, toolLookup(mcpId,name)->row|null,
@@ -21,7 +22,21 @@ export async function evaluateRequest(deps, req) {
   const config = deps.config || {};
 
   req = { id: req.id || uuid(), ts: req.ts || nowMs(), ...req };
+
+  // ---- 0) UNIVERSAL INPUT (2.0 seam) — legacy requests pass through untouched ----
+  try {
+    req = universalizeRequest(req);
+  } catch (e) {
+    // Fail-closed: a malformed resource descriptor never reaches the engines.
+    return finalize(deps, req, {
+      decision: 'BLOCK', risk: 60, confidence: 100, trust: null, path: 'fast',
+      reasons: ['resource:invalid:' + String(e.message).slice(0, 48)],
+      policyRefs: [], evidence: [{ factor: 'resource', note: String(e.message).slice(0, 120) }],
+      latencyMs: Date.now() - t0,
+    }, {});
+  }
   const mcpSubject = req.mcpId ? `mcp:${req.mcpId}` : null;
+  const gateSubject = req.resource?.key || mcpSubject;   // 2.0: non-MCP resources carry their own subject
 
   // ---- 1) IDENTITY ----
   let identity = { verified: false, subjectId: null, reason: 'no-check' };
@@ -39,36 +54,39 @@ export async function evaluateRequest(deps, req) {
   }
 
   // ---- 1b) QUARANTINE override (containment is sticky) ----
-  if (mcpSubject) {
-    const q = deps.storage.q.quarGet.get(mcpSubject);
+  if (gateSubject) {
+    const q = deps.storage.q.quarGet.get(gateSubject);
     if (q) return finalize(deps, req, {
-      decision: 'BLOCK', risk: 100, confidence: 100, trust: trustScoreOf(deps, mcpSubject),
+      decision: 'BLOCK', risk: 100, confidence: 100, trust: trustScoreOf(deps, gateSubject),
       path: 'fast', reasons: ['quarantine:active'], policyRefs: [], evidence: [{ factor: 'quarantine', note: q.reason }],
       latencyMs: Date.now() - t0, containmentHint: 'already-quarantined',
-    }, { subjectId: mcpSubject });
+    }, { subjectId: gateSubject });
   }
 
   // ---- 2) AUTHORIZATION — hard gate ----
   let authz = { decision: 'ALLOW', grant: null, reason: 'authz disabled (test harness)' };
   if (deps.authz && req.authz !== false) {
-    authz = deps.authz.evaluate(subjectId, `tool.${req.toolId || '*'}`, req.mcpId || '*', req.params || {});
+    authz = deps.authz.evaluate(subjectId, capabilityOf(req), req.gateResource ?? req.mcpId ?? '*', req.params || {});
     if (authz.decision === 'DENY') {
       const sensitive = classifyMetaSensitivity(req);
       const decision = sensitive ? 'BLOCK' : 'REVIEW';
       emit('authorization:denied:' + authz.reason);
       return finalize(deps, req, {
-        decision, risk: sensitive ? 70 : 45, confidence: 95, trust: trustScoreOf(deps, mcpSubject),
+        decision, risk: sensitive ? 70 : 45, confidence: 95, trust: trustScoreOf(deps, gateSubject),
         path: 'fast', reasons, policyRefs: [], evidence: [{ factor: 'authorization', note: authz.reason }],
         latencyMs: Date.now() - t0, authzDenied: true,
-      }, { subjectId: mcpSubject });
+      }, { subjectId: gateSubject });
     }
   }
 
-  // ---- 3) TOOL LEGITIMACY ----
-  let toolRow = null, toolMeta = {};
+  // ---- 3) TOOL LEGITIMACY (registry, or adapter-supplied metadata for 2.0 planes) ----
+  let toolRow = null, toolMeta = {}, knownViaAdapter = false;
   if (deps.toolLookup) toolRow = deps.toolLookup(req.mcpId, req.toolId);
-  const toolKnown = !!toolRow;
   if (toolRow) try { toolMeta = JSON.parse(toolRow.riskMeta || '{}'); } catch {}
+  else if (deps.resourceMeta && req.resource) {
+    try { const m = deps.resourceMeta(req.resource); if (m && typeof m === 'object') { toolMeta = m; knownViaAdapter = true; } } catch {}
+  }
+  const toolKnown = !!toolRow || knownViaAdapter;
   const schemaViolation = toolRow ? checkSchema(toolRow, req.params) : null;
   if (!toolKnown) emit('tool:unknown');
   if (schemaViolation) emit('tool:schema-violation:' + schemaViolation);
@@ -94,12 +112,15 @@ export async function evaluateRequest(deps, req) {
     action: req.action, tool: req.toolId, mcp: req.mcpId, agent: req.agentId,
     identityVerified: identity.verified, mode: req.ctx?.mode || 'SENTINEL',
     anomaly: (req.behavior?.anomalyScore || 0) > 0.5,
+    // 2.0 policy predicates (additive; legacy requests carry nulls and match nothing new)
+    resourceType: req.resource?.type || null, resourceKey: req.resource?.key || null,
+    adapterId: req.ctx?.adapterId || null, subjectType: subjectId.includes(':') ? subjectId.split(':')[0] : null,
   };
   const pol = deps.policyEngine.evaluate(policySet, reqCtx);
   for (const h of pol.hits) policyRefs.push(`${h.pack}:${deps.policyEngine.packVersion(h.pack)}:${h.ruleId}`);
 
   // ---- 8) DECISION CACHE ----
-  const trustRec = mcpSubject ? trust.getTrust(deps.storage, mcpSubject) : { state: 'UNKNOWN', score: 50 };
+  const trustRec = gateSubject ? trust.getTrust(deps.storage, gateSubject) : { state: 'UNKNOWN', score: 50 };
   const fingerprint = decisionFingerprint({
     policyVer: stableStringify(policySet.versions), authzState: authz.grant ? 'granted' : 'open',
     tool: req.toolId, toolVer: toolRow?.toolVersion || '0', action: req.action,
@@ -110,12 +131,14 @@ export async function evaluateRequest(deps, req) {
     // otherwise a cached ALLOW for a benign shape replays over an injected/sensitive payload.
     injHit: req.injection?.hit ? 1 : 0,
     classifySig: (req.classifyMatches || []).length ? sha256hex(stableStringify([...req.classifyMatches].sort())).slice(0, 8) : 'none',
+    // 2.0: resource-scoped cache keys (conditional — legacy fingerprints untouched)
+    ...(req.resource ? { res: req.resource.key } : {}),
   });
   if (deps.cacheEnabled !== false) {
     const hit = cacheLookup(deps.storage, fingerprint);
     if (hit) {
       return finalize(deps, req, { ...hit.verdict, path: 'cached', latencyMs: Date.now() - t0, cacheFingerprint: fingerprint },
-        { subjectId: mcpSubject, cacheHit: true });
+        { subjectId: gateSubject, cacheHit: true });
     }
   }
 
@@ -188,7 +211,7 @@ export async function evaluateRequest(deps, req) {
   }
 
   const verdict = {
-    decision, risk: Math.round(risk), confidence, trust: trustScoreOf(deps, mcpSubject),
+    decision, risk: Math.round(risk), confidence, trust: trustScoreOf(deps, gateSubject),
     path: semanticUsed ? 'semantic' : 'fast',
     reasons, policyRefs, evidence, latencyMs: Date.now() - t0,
     cacheFingerprint: fingerprint,
@@ -197,7 +220,7 @@ export async function evaluateRequest(deps, req) {
   else if (risk >= th.risk.high && decision === 'BLOCK') verdict.containmentHint = 'L2-deny';
 
   cacheStore(deps.storage, fingerprint, verdict, policySet, decision === 'ALLOW');
-  return finalize(deps, req, verdict, { subjectId: mcpSubject, semanticUsed });
+  return finalize(deps, req, verdict, { subjectId: gateSubject, semanticUsed });
 }
 
 function riskAdj(risk, delta) { return clamp(Math.round(risk + delta), 0, 100); }
@@ -217,7 +240,7 @@ function finalize(deps, req, verdict, extra = {}) {
       decision: verdict.decision, risk: verdict.risk, confidence: verdict.confidence, trust: verdict.trust,
       path: verdict.path, reasons: verdict.reasons, policyRefs: verdict.policyRefs,
       evidence: (verdict.evidence || []).map((e) => ({ f: e.factor, n: String(e.note || '').slice(0, 160) })),
-      detail: { requestId: req.id, cacheHit: !!extra.cacheHit, mcp: req.mcpId, destination: req.destination?.host || null },
+      detail: { requestId: req.id, cacheHit: !!extra.cacheHit, mcp: req.mcpId, destination: req.destination?.host || null, resource: req.resource?.key || undefined, adapter: req.ctx?.adapterId || undefined },
     });
   }
   // event bus + metrics
