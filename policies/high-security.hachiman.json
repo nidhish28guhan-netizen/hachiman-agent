@@ -1,0 +1,40 @@
+{
+  "id": "high-security",
+  "version": 1,
+  "description": "High-security pack: deterministic-only (semantic analysis disabled), metadata-first, fail-closed.",
+  "thresholds": {
+    "risk": { "low": 20, "medium": 45, "high": 65, "critical": 85 },
+    "confidenceFloor": 85
+  },
+  "riskWeights": {
+    "identity": 0.12,
+    "tool": 0.14,
+    "permission": 0.12,
+    "data": 0.22,
+    "context": 0.16,
+    "behavior": 0.10,
+    "destination": 0.10,
+    "impact": 0.04
+  },
+  "cache": { "positiveTtlMs": 300000, "negativeTtlMs": 150000 },
+  "response": { "maxLadder": 6 },
+  "semantic": { "enabled": false },
+  "rules": [
+    {
+      "id": "deny-unregistered-tool",
+      "when": { "toolUnknown": true },
+      "then": { "decision": "BLOCK", "riskFloor": 85, "reason": "tool not in registry" }
+    },
+    {
+      "id": "block-external",
+      "when": { "destinationClass": "external" },
+      "then": { "decision": "BLOCK", "riskFloor": 85, "reason": "external destinations blocked" }
+    },
+    {
+      "id": "injection-indicator",
+      "when": { "injectionIndicator": true },
+      "then": { "decision": "BLOCK", "riskFloor": 90, "reason": "prompt-injection indicator" }
+    }
+  ],
+  "classify": { "inspectContent": false }
+}

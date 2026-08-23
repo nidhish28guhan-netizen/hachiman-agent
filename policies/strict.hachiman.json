@@ -1,0 +1,44 @@
+{
+  "id": "strict",
+  "version": 1,
+  "description": "Strict policy pack — fail-closed, minimal egress, no unknown destinations.",
+  "thresholds": {
+    "risk": { "low": 15, "medium": 40, "high": 60, "critical": 80 },
+    "confidenceFloor": 90
+  },
+  "riskWeights": {
+    "identity": 0.12,
+    "tool": 0.15,
+    "permission": 0.12,
+    "data": 0.22,
+    "context": 0.15,
+    "behavior": 0.10,
+    "destination": 0.10,
+    "impact": 0.04
+  },
+  "cache": { "positiveTtlMs": 120000, "negativeTtlMs": 120000 },
+  "response": { "maxLadder": 6 },
+  "rules": [
+    {
+      "id": "deny-unregistered-tool",
+      "when": { "toolUnknown": true },
+      "then": { "decision": "BLOCK", "riskFloor": 80, "reason": "tool not in registry" }
+    },
+    {
+      "id": "block-any-external",
+      "when": { "destinationClass": "external" },
+      "then": { "decision": "BLOCK", "riskFloor": 80, "reason": "external egress denied under strict policy" }
+    },
+    {
+      "id": "review-confidential",
+      "when": { "dataClassIn": ["confidential", "restricted"] },
+      "then": { "decision": "REVIEW", "riskDelta": 25, "reason": "confidential data access requires review" }
+    },
+    {
+      "id": "injection-indicator",
+      "when": { "injectionIndicator": true },
+      "then": { "decision": "BLOCK", "riskFloor": 90, "reason": "prompt-injection indicator" }
+    }
+  ],
+  "classify": { "inspectContent": true }
+}

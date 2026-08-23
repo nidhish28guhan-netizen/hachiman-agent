@@ -1,0 +1,110 @@
+[
+  {
+    "id": "benign-001", "category": "benign", "label": "benign",
+    "setup": {
+      "grants": [{ "subject": "agent:user1", "capability": "tool.*", "resource": "notes" }],
+      "trust": { "mcp:notes": { "state": "TRUSTED", "score": 90 } },
+      "tools": [{ "mcpId": "notes", "name": "notes.create", "inputSchema": { "type": "object", "properties": { "title": { "type": "string" }, "body": { "type": "string" } }, "required": ["title"], "additionalProperties": false }, "riskMeta": { "sideEffectRisk": 15 } }]
+    },
+    "requests": [{ "agentId": "agent:user1", "mcpId": "notes", "toolId": "notes.create", "params": { "title": "meeting notes", "body": "discussed roadmap" }, "expect": { "decision": "ALLOW" } }]
+  },
+  {
+    "id": "benign-002", "category": "benign", "label": "benign",
+    "setup": {
+      "grants": [{ "subject": "agent:user1", "capability": "tool.*", "resource": "notes" }],
+      "trust": { "mcp:notes": { "state": "TRUSTED", "score": 90 } },
+      "tools": [{ "mcpId": "notes", "name": "notes.read", "inputSchema": { "type": "object", "properties": { "id": { "type": "integer" } }, "required": ["id"], "additionalProperties": false }, "riskMeta": {} }]
+    },
+    "requests": [{ "agentId": "agent:user1", "mcpId": "notes", "toolId": "notes.read", "params": { "id": 3 }, "expect": { "decision": "ALLOW" } }]
+  },
+  {
+    "id": "benign-003", "category": "benign", "label": "benign",
+    "setup": {
+      "grants": [{ "subject": "agent:user2", "capability": "tool.*", "resource": "calc" }],
+      "trust": { "mcp:calc": { "state": "TRUSTED", "score": 92 } },
+      "tools": [{ "mcpId": "calc", "name": "calc.add", "inputSchema": { "type": "object", "properties": { "a": { "type": "number" }, "b": { "type": "number" } }, "required": ["a", "b"], "additionalProperties": false }, "riskMeta": {} }]
+    },
+    "requests": [{ "agentId": "agent:user2", "mcpId": "calc", "toolId": "calc.add", "params": { "a": 21, "b": 21 }, "expect": { "decision": "ALLOW" } }]
+  },
+  {
+    "id": "benign-004", "category": "benign", "label": "benign",
+    "setup": {
+      "grants": [{ "subject": "agent:user2", "capability": "tool.*", "resource": "calc" }],
+      "trust": { "mcp:calc": { "state": "TRUSTED", "score": 92 } },
+      "tools": [{ "mcpId": "calc", "name": "calc.multiply", "inputSchema": { "type": "object", "properties": { "a": { "type": "number" }, "b": { "type": "number" } }, "required": ["a", "b"], "additionalProperties": false }, "riskMeta": {} }]
+    },
+    "requests": [{ "agentId": "agent:user2", "mcpId": "calc", "toolId": "calc.multiply", "params": { "a": 6, "b": 7 }, "expect": { "decision": "ALLOW" } }]
+  },
+  {
+    "id": "benign-005", "category": "benign", "label": "benign",
+    "setup": {
+      "grants": [{ "subject": "agent:user3", "capability": "tool.*", "resource": "echo" }],
+      "trust": { "mcp:echo": { "state": "TRUSTED", "score": 93 } },
+      "tools": [{ "mcpId": "echo", "name": "echo.text", "inputSchema": { "type": "object", "properties": { "text": { "type": "string" } }, "required": ["text"], "additionalProperties": false }, "riskMeta": {} }]
+    },
+    "requests": [{ "agentId": "agent:user3", "mcpId": "echo", "toolId": "echo.text", "params": { "text": "hello world" }, "expect": { "decision": "ALLOW" } }]
+  },
+  {
+    "id": "benign-006", "category": "benign", "label": "benign",
+    "setup": {
+      "grants": [{ "subject": "agent:user4", "capability": "tool.*", "resource": "time" }],
+      "trust": { "mcp:time": { "state": "TRUSTED", "score": 94 } },
+      "tools": [{ "mcpId": "time", "name": "time.now", "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }, "riskMeta": {} }]
+    },
+    "requests": [{ "agentId": "agent:user4", "mcpId": "time", "toolId": "time.now", "params": {}, "expect": { "decision": "ALLOW" } }]
+  },
+  {
+    "id": "benign-007", "category": "benign", "label": "benign",
+    "setup": {
+      "grants": [{ "subject": "agent:user5", "capability": "tool.*", "resource": "filesearch" }],
+      "trust": { "mcp:filesearch": { "state": "TRUSTED", "score": 88 } },
+      "tools": [{ "mcpId": "filesearch", "name": "filesearch.list", "inputSchema": { "type": "object", "properties": { "dir": { "type": "string" } }, "additionalProperties": false }, "riskMeta": {} }]
+    },
+    "requests": [{ "agentId": "agent:user5", "mcpId": "filesearch", "toolId": "filesearch.list", "params": { "dir": "reports" }, "expect": { "decision": "ALLOW" } }]
+  },
+  {
+    "id": "benign-008", "category": "benign", "label": "benign",
+    "setup": {
+      "grants": [{ "subject": "agent:user6", "capability": "tool.*", "resource": "crm-read" }],
+      "trust": { "mcp:crm-read": { "state": "TRUSTED", "score": 87 } },
+      "tools": [{ "mcpId": "crm-read", "name": "crm.get_contact", "inputSchema": { "type": "object", "properties": { "id": { "type": "string" } }, "required": ["id"], "additionalProperties": false }, "riskMeta": {} }]
+    },
+    "requests": [{ "agentId": "agent:user6", "mcpId": "crm-read", "toolId": "crm.get_contact", "params": { "id": "C-100" }, "expect": { "decision": "ALLOW" } }]
+  },
+  {
+    "id": "benign-009", "category": "benign", "label": "benign",
+    "setup": {
+      "grants": [{ "subject": "agent:user7", "capability": "tool.*", "resource": "wiki" }],
+      "trust": { "mcp:wiki": { "state": "TRUSTED", "score": 86 } },
+      "tools": [{ "mcpId": "wiki", "name": "wiki.search", "inputSchema": { "type": "object", "properties": { "q": { "type": "string" } }, "required": ["q"], "additionalProperties": false }, "riskMeta": {} }]
+    },
+    "requests": [{ "agentId": "agent:user7", "mcpId": "wiki", "toolId": "wiki.search", "params": { "q": "release checklist" }, "expect": { "decision": "ALLOW" } }]
+  },
+  {
+    "id": "benign-010", "category": "benign", "label": "benign",
+    "setup": {
+      "grants": [{ "subject": "agent:user8", "capability": "tool.*", "resource": "notes" }],
+      "trust": { "mcp:notes": { "state": "TRUSTED", "score": 90 } },
+      "tools": [{ "mcpId": "notes", "name": "notes.list", "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }, "riskMeta": {} }]
+    },
+    "requests": [{ "agentId": "agent:user8", "mcpId": "notes", "toolId": "notes.list", "params": {}, "expect": { "decision": "ALLOW" } }]
+  },
+  {
+    "id": "benign-011", "category": "benign", "label": "benign",
+    "setup": {
+      "grants": [{ "subject": "agent:user9", "capability": "tool.*", "resource": "calendar" }],
+      "trust": { "mcp:calendar": { "state": "TRUSTED", "score": 85 } },
+      "tools": [{ "mcpId": "calendar", "name": "calendar.free_slots", "inputSchema": { "type": "object", "properties": { "date": { "type": "string" } }, "required": ["date"], "additionalProperties": false }, "riskMeta": {} }]
+    },
+    "requests": [{ "agentId": "agent:user9", "mcpId": "calendar", "toolId": "calendar.free_slots", "params": { "date": "2026-09-01" }, "expect": { "decision": "ALLOW" } }]
+  },
+  {
+    "id": "benign-012", "category": "benign", "label": "benign",
+    "setup": {
+      "grants": [{ "subject": "agent:user10", "capability": "tool.*", "resource": "status" }],
+      "trust": { "mcp:status": { "state": "TRUSTED", "score": 89 } },
+      "tools": [{ "mcpId": "status", "name": "status.check", "inputSchema": { "type": "object", "properties": { "service": { "type": "string" } }, "required": ["service"], "additionalProperties": false }, "riskMeta": {} }]
+    },
+    "requests": [{ "agentId": "agent:user10", "mcpId": "status", "toolId": "status.check", "params": { "service": "api-gateway" }, "expect": { "decision": "ALLOW" } }]
+  }
+]

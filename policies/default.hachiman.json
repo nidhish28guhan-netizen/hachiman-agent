@@ -1,0 +1,54 @@
+{
+  "id": "default",
+  "version": 1,
+  "description": "Hachiman default policy pack — balanced protection.",
+  "thresholds": {
+    "risk": { "low": 25, "medium": 55, "high": 75, "critical": 90 },
+    "confidenceFloor": 80
+  },
+  "riskWeights": {
+    "identity": 0.10,
+    "tool": 0.15,
+    "permission": 0.10,
+    "data": 0.20,
+    "context": 0.15,
+    "behavior": 0.10,
+    "destination": 0.15,
+    "impact": 0.05
+  },
+  "cache": { "positiveTtlMs": 600000, "negativeTtlMs": 300000 },
+  "response": { "maxLadder": 6 },
+  "rules": [
+    {
+      "id": "deny-unregistered-tool",
+      "when": { "toolUnknown": true },
+      "then": { "decision": "BLOCK", "riskFloor": 70, "reason": "tool not in registry" }
+    },
+    {
+      "id": "external-egress-restricted-data",
+      "when": { "destinationClass": "external", "dataClassIn": ["confidential", "restricted"] },
+      "then": { "decision": "BLOCK", "riskFloor": 90, "reason": "confidential data to external destination" }
+    },
+    {
+      "id": "review-external-unknown-host",
+      "when": { "destinationClass": "external", "destinationKnown": false, "dataClassIn": ["internal"] },
+      "then": { "decision": "REVIEW", "riskDelta": 20, "reason": "unknown external destination" }
+    },
+    {
+      "id": "allow-internal-lowclass",
+      "when": { "destinationClass": "internal", "dataClassIn": ["public", "internal"] },
+      "then": { "decision": "ALLOW", "riskDelta": -10, "reason": "internal low-class traffic" }
+    },
+    {
+      "id": "review-confidential-data",
+      "when": { "dataClassIn": ["confidential", "restricted"], "destinationClass": "internal" },
+      "then": { "decision": "REVIEW", "riskDelta": 15, "reason": "confidential/restricted data access requires review" }
+    },
+    {
+      "id": "injection-indicator",
+      "when": { "injectionIndicator": true },
+      "then": { "decision": "BLOCK", "riskFloor": 85, "reason": "prompt-injection indicator in tool context" }
+    }
+  ],
+  "classify": { "inspectContent": false }
+}

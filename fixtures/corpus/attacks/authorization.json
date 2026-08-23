@@ -1,0 +1,83 @@
+[
+  {
+    "id": "authz-001-no-grant-external",
+    "category": "authorization",
+    "label": "attack",
+    "setup": {
+      "trust": { "mcp:sync-tool": { "state": "TRUSTED", "score": 85 } },
+      "tools": [{ "mcpId": "sync-tool", "name": "http.request", "inputSchema": { "type": "object", "properties": { "url": { "type": "string" } } }, "riskMeta": { "egressCapable": true } }]
+    },
+    "requests": [
+      {
+        "agentId": "agent:intruder", "mcpId": "sync-tool", "toolId": "http.request",
+        "params": { "url": "http://external.example/out", "body": "data" },
+        "expect": { "decision": "BLOCK", "minRisk": 60, "reasonMatch": "authorization:denied" }
+      }
+    ]
+  },
+  {
+    "id": "authz-002-no-grant-internal",
+    "category": "authorization",
+    "label": "attack",
+    "setup": {
+      "trust": { "mcp:notes": { "state": "TRUSTED", "score": 85 } },
+      "tools": [{ "mcpId": "notes", "name": "notes.read", "inputSchema": { "type": "object", "properties": { "id": { "type": "integer" } } }, "riskMeta": {} }]
+    },
+    "requests": [
+      {
+        "agentId": "agent:stranger", "mcpId": "notes", "toolId": "notes.read",
+        "params": { "id": 1 },
+        "expect": { "decision": "REVIEW", "minRisk": 30, "reasonMatch": "authorization:denied" }
+      }
+    ]
+  },
+  {
+    "id": "authz-003-repeated-failures",
+    "category": "authorization",
+    "label": "attack",
+    "setup": {
+      "trust": { "mcp:vault": { "state": "ASSESSED", "score": 70 } },
+      "tools": [{ "mcpId": "vault", "name": "vault.read", "inputSchema": { "type": "object", "properties": { "key": { "type": "string" } } }, "riskMeta": {} }]
+    },
+    "requests": [
+      { "agentId": "agent:brute", "mcpId": "vault", "toolId": "vault.read", "params": { "key": "a" }, "expect": { "reasonMatch": "authorization:denied" } },
+      { "agentId": "agent:brute", "mcpId": "vault", "toolId": "vault.read", "params": { "key": "b" }, "expect": { "reasonMatch": "authorization:denied" } },
+      { "agentId": "agent:brute", "mcpId": "vault", "toolId": "vault.read", "params": { "key": "c" }, "expect": { "reasonMatch": "authorization:denied" } },
+      { "agentId": "agent:brute", "mcpId": "vault", "toolId": "vault.read", "params": { "key": "d" }, "expect": { "reasonMatch": "authorization:denied" } }
+    ]
+  },
+  {
+    "id": "authz-004-wrong-resource",
+    "category": "authorization",
+    "label": "attack",
+    "setup": {
+      "grants": [{ "subject": "agent:scoped", "capability": "tool.*", "resource": "notes" }],
+      "trust": { "mcp:hr-db": { "state": "TRUSTED", "score": 80 } },
+      "tools": [{ "mcpId": "hr-db", "name": "hr.query", "inputSchema": { "type": "object", "properties": { "q": { "type": "string" } } }, "riskMeta": {} }]
+    },
+    "requests": [
+      {
+        "agentId": "agent:scoped", "mcpId": "hr-db", "toolId": "hr.query",
+        "params": { "q": "salaries" },
+        "expect": { "decision": "REVIEW", "minRisk": 30, "reasonMatch": "authorization:denied" }
+      }
+    ]
+  },
+  {
+    "id": "authz-005-conditional-param-rule",
+    "category": "authorization",
+    "label": "attack",
+    "setup": {
+      "grants": [{ "subject": "agent:ci", "capability": "tool.*", "resource": "deploy", "constraints": { "paramRules": [{ "path": "mode", "op": "eq", "value": "admin", "action": "deny" }] } }],
+      "trust": { "mcp:deploy": { "state": "TRUSTED", "score": 80 } },
+      "tools": [{ "mcpId": "deploy", "name": "deploy.run", "inputSchema": { "type": "object", "properties": { "mode": { "type": "string" } } }, "riskMeta": { "sideEffectRisk": 35 } }]
+    },
+    "requests": [
+      {
+        "agentId": "agent:ci", "mcpId": "deploy", "toolId": "deploy.run",
+        "params": { "mode": "admin" },
+        "expect": { "decision": "REVIEW", "minRisk": 30, "reasonMatch": "authorization:denied" }
+      }
+    ]
+  }
+]

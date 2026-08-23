@@ -1,0 +1,9 @@
+{
+  "engagement": {
+    "target": "mcp:vuln-notes-fixed",
+    "environment": "local-lab",
+    "authorized_by": "operator (lab owner)",
+    "conn": { "fixture": "vuln-notes-fixed" },
+    "rules": { "max_requests": 60, "max_duration_ms": 60000 }
+  }
+}

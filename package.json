@@ -1,0 +1,26 @@
+{
+  "name": "hachiman",
+  "version": "0.1.0",
+  "description": "NG's Hachiman Agent — autonomous security layer for AI agents and MCP: scan before deployment, authorize before access, monitor during execution, contain when compromised, report everything.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22.5" },
+  "bin": { "hachiman": "./bin/hachiman.js" },
+  "scripts": {
+    "setup": "node scripts/install.js",
+    "setup:check": "node scripts/install.js --check",
+    "test": "node --test 'test/**/*.test.js'",
+    "test:unit": "node --test 'test/unit/*.test.js'",
+    "test:golden": "node --test test/golden.test.js",
+    "test:corpus": "node --test test/corpus.test.js",
+    "test:e2e": "node --test --test-concurrency=1 'test/e2e/*.test.js'",
+    "test:property": "node --test test/property.test.js",
+    "demo": "node scripts/demo.js",
+    "spo": "node packages/benchmark/src/spo.js --micro",
+    "offense-bench": "node packages/benchmark/src/offense-metrics.js",
+    "cli": "node bin/hachiman.js"
+  },
+  "workspaces": [
+    "packages/*"
+  ]
+}

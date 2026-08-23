@@ -1,0 +1,34 @@
+name: cross-platform
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        node: ['22', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Universal installer check (read-only health check)
+        run: node scripts/install.js --check
+      - name: Universal installer full setup + engine self-test
+        run: node scripts/install.js
+      - name: Guard smoke test (--once)
+        run: |
+          node bin/hachiman.js init
+          node bin/hachiman.js config set mcpServers.notes '{"fixture":"notes"}'
+          node bin/hachiman.js guard --once
+      - name: Full test suite (unit + golden + corpus + property + e2e)
+        run: npm test
+      - name: Demo story end-to-end
+        run: node scripts/demo.js
