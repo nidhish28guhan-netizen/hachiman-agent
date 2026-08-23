@@ -115,6 +115,8 @@ export async function evaluateRequest(deps, req) {
     // 2.0 policy predicates (additive; legacy requests carry nulls and match nothing new)
     resourceType: req.resource?.type || null, resourceKey: req.resource?.key || null,
     adapterId: req.ctx?.adapterId || null, subjectType: subjectId.includes(':') ? subjectId.split(':')[0] : null,
+    // paramHas: deterministic substring context over param values (no pack uses it pre-2.0)
+    paramHas: typeof req.params === 'string' ? req.params : JSON.stringify(req.params ?? {}),
   };
   const pol = deps.policyEngine.evaluate(policySet, reqCtx);
   for (const h of pol.hits) policyRefs.push(`${h.pack}:${deps.policyEngine.packVersion(h.pack)}:${h.ruleId}`);
