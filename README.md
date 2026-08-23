@@ -20,21 +20,48 @@ installation contract any AI coding agent can execute on any OS.
 
 ## Quick start
 
-```bash
-node --version           # needs >= 22.5 (uses node:sqlite)
-node scripts/install.js  # universal installer: health check + config + engine self-test (any OS)
+Hachiman is distributed **exclusively through this git repository** — it is not published on npm
+or any package registry. Clone it and run everything from inside the clone:
 
-npm test                 # full suite: unit + golden + corpus + property + e2e
-npm run demo             # the A→Z story: scan → authorize → block → quarantine → report
-npm run spo              # Security Protection Overhead benchmark (micro)
+```bash
+git clone https://github.com/nidhish28guhan-netizen/hachiman-agent.git
+cd hachiman-agent
+```
+
+All commands below assume your shell is inside the cloned `hachiman-agent` directory.
+
+```bash
+# Requirement: Node.js >= 22.5 (Hachiman uses node:sqlite and node:test)
+node --version
+
+# Universal installer: health check + config + engine self-test (any OS)
+node scripts/install.js
+
+# Full suite: unit + golden + corpus + property + e2e
+npm test
+
+# The A→Z story: scan → authorize → block → quarantine → report
+npm run demo
+
+# Security Protection Overhead benchmark (micro)
+npm run spo
+
+# CLI reference
 node bin/hachiman.js help
 ```
+
+> **Note:** comments above are on their own lines on purpose — in default zsh (macOS), a trailing
+> `#` on the same line as a command is not treated as a comment. Copy commands line by line, or as
+> whole blocks; never mix shell comments onto command lines.
+
+* **No `npm install` step is required** — there are zero runtime dependencies.
+* **The git repository is the single source of truth.** There is no downloaded/zip distribution to
+  run; always operate from a clone of this repository so you have the exact, complete, tested tree
+  (source, tests, fixtures, policy packs, and docs together).
 
 Installing with an AI builder? Copy the one-prompt block from [`AI-BUILDER.md`](AI-BUILDER.md) into
 Claude Code / Codex / Cursor / Hermes / any coding agent — it verifies Node, runs the installer,
 smoke-tests the guard, and runs the whole suite, with machine-readable success criteria.
-
-No install step is required — there are no dependencies.
 
 ---
 

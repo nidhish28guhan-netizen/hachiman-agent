@@ -12,6 +12,10 @@
 **Developer / Author:** NidhishGuhan​‌‍‌‌‌‌‌‍‌‍‌‍‌‍‌‍‌‍‌‍‌‍‌‌‌‍‌‌‍‌‌‌‌‍‌‌‍‍‍‍‌‍‌‍‌‌‍‌‌‌‍‍‍‍‌‍‌‍‌‌‍‍‍‌‌‍‍‌‍‌‌‍‌‍‍‌‌‍‌‌‌‍‍‌‍‌‌‌‌‍‍‌‍‌‌‍‌‍‍‍‌‌‍‍‌‍‍‌‍‌‌‌‌‍‌‌‌‍‍‍‌‍‍‍‌‍‌‍‌‍‍‌‍‌‌‌‌‍‍‌‌‌‌‍‌‍‍‌‍‍‍‌‌‌‍‍‍‌‍‍‌‍‌‌‌‍‌‌‌‍‌‌‍‍‍‍‌‌‍‌‍‍‌‍‌‍‌‌‍‍‍‌‌‍‌‌‍‍‍‍‌‍‌‍‌‍‌‌‌‌‍‌‍‍‌‍‌‍‌‍‌‌‍‌‌‍‌‌‌‍‌‍‌‍‌‌‌‍‌‌‌‍‌‌‍‌‌‍‌‍‌‍‌‌‍‍‌‍‌‍‌‍‌‌‌‍‌‍‌‌‍‌‌‍‌‌‍‌‌‍‌‍‌‌‌‌‍‌‌‍‌‍‌‍‌‍‌‍‌‍‌‍‌‌‌‍‌‌‌‍‌‍﻿
 **Document:** Hachiman Agent Guide (v1.0)
 **Applies to:** the Hachiman Agent implementation in this repository (Node ≥ 22.5, zero runtime dependencies)
+**Distribution:** the git repository is the only official distribution channel — clone
+`https://github.com/nidhish28guhan-netizen/hachiman-agent.git` and run Hachiman from inside the
+clone. Hachiman is not published on npm or any package registry, and there is no supported
+zip/standalone download.
 
 This document is a **usage guide, feature reference, platform-integration handbook, and
 implementation manual** for the Hachiman Agent. Every capability described below is implemented
