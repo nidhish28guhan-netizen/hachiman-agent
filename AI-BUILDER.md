@@ -120,6 +120,10 @@ node bin/hachiman.js agent add <who> --allow <mcp1,mcp2> --ttl 24   # → prints
 Works with: Claude Desktop, Claude Code, Codex CLI, Hermes, OpenClaw, Qoder, DeepSeek Harness, and
 anything else speaking MCP stdio or HTTP.
 
+Step-by-step, per-platform wiring (Claude Desktop / Claude Code / Codex CLI / Cursor / Windsurf /
+GitHub Copilot / Gemini CLI / Hermes / OpenClaw / Qoder / DeepSeek Harness) lives in
+`README.md` → "Hachiman inside AI builders".
+
 ---
 
 ## 5. Verification contract (what “installed correctly” means)

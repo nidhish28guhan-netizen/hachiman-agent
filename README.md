@@ -59,9 +59,162 @@ node bin/hachiman.js help
   run; always operate from a clone of this repository so you have the exact, complete, tested tree
   (source, tests, fixtures, policy packs, and docs together).
 
-Installing with an AI builder? Copy the one-prompt block from [`AI-BUILDER.md`](AI-BUILDER.md) into
-Claude Code / Codex / Cursor / Hermes / any coding agent — it verifies Node, runs the installer,
-smoke-tests the guard, and runs the whole suite, with machine-readable success criteria.
+---
+
+## Hachiman inside AI builders (Claude, Codex, Hermes, OpenClaw & more)
+
+Hachiman is designed to be installed and operated **from inside AI coding builders, on any OS**.
+Every integration uses standard mechanisms only — a shell, MCP stdio, or MCP-over-HTTP. **No SDK,
+no plugin, no platform fork is required.** Anything that can run a terminal command or speak MCP
+can use Hachiman.
+
+There are two roles an AI builder can play, and a single platform can play both:
+
+| Role | Meaning | Mechanism |
+|---|---|---|
+| **Installer / operator** | The AI builder installs and runs Hachiman on your machine | It has terminal access → paste the one-prompt block from [`AI-BUILDER.md`](AI-BUILDER.md) |
+| **Protected client** | The AI builder is the agent being secured; its tool calls pass through the Hachiman gateway | Register the **stdio bridge** or the **HTTP endpoint** in the platform's MCP config |
+
+### Supported AI builders — organized compatibility matrix
+
+| AI builder | Vendor | Windows | macOS | Linux | Installs Hachiman | Protected client |
+|---|---|---|---|---|---|---|
+| Claude Code | Anthropic | ✅ | ✅ | ✅ | ✅ (terminal) | ✅ MCP stdio/HTTP |
+| Claude Desktop | Anthropic | ✅ | ✅ | ✅ | — | ✅ MCP stdio |
+| Codex CLI | OpenAI | ✅ | ✅ | ✅ | ✅ (terminal) | ✅ MCP stdio/HTTP |
+| Cursor | Anysphere | ✅ | ✅ | ✅ | ✅ (terminal) | ✅ MCP stdio/HTTP |
+| Windsurf | Codeium | ✅ | ✅ | ✅ | ✅ (terminal) | ✅ MCP stdio/HTTP |
+| GitHub Copilot / VS Code agent | GitHub / Microsoft | ✅ | ✅ | ✅ | ✅ (terminal) | ✅ MCP stdio/HTTP |
+| Gemini CLI | Google | ✅ | ✅ | ✅ | ✅ (terminal) | ✅ MCP stdio/HTTP |
+| Hermes | Nous Research | ✅ | ✅ | ✅ | ✅ (terminal) | ✅ MCP stdio/HTTP |
+| OpenClaw | community | ✅ | ✅ | ✅ | ✅ (terminal) | ✅ MCP stdio/HTTP |
+| DeepSeek Harness | DeepSeek | ✅ | ✅ | ✅ | ✅ (managed job) | ✅ MCP stdio/HTTP |
+| Qoder | Alibaba | ✅ | ✅ | ✅ | ✅ (terminal) | ✅ MCP stdio/HTTP |
+| Aider | community | ✅ | ✅ | ✅ | ✅ (terminal) | shell commands (no MCP) |
+| Anything else speaking MCP | — | ✅ | ✅ | ✅ | ✅ if it has a shell | ✅ MCP stdio/HTTP |
+
+*(Requirement everywhere: Node.js ≥ 22.5. MCP config file names and schemas evolve between
+platform versions; when a platform's own docs differ, trust the platform docs — the bridge command
+and env variables below never change.)*
+
+### Step 0 — same start on every platform
+
+```bash
+git clone https://github.com/nidhish28guhan-netizen/hachiman-agent.git
+cd hachiman-agent
+node scripts/install.js
+```
+
+### Step 1 — let the AI builder install & verify it (paste one prompt)
+
+Open your AI builder **in the cloned directory** (or tell it the path) and paste the one-prompt
+block from [`AI-BUILDER.md`](AI-BUILDER.md) §1 verbatim. The builder checks Node, runs the
+installer, boots the guard, and runs the full test suite — with machine-readable success criteria
+(`RESULT: READY on <os>`, `HACHIMAN GUARD ACTIVE`, `# fail 0`). This is identical in Claude Code,
+Codex CLI, Cursor, Windsurf, Copilot, Gemini CLI, Hermes, OpenClaw, DeepSeek Harness, Qoder, and
+Aider — they all have terminal access.
+
+### Step 2 — issue a session for the builder
+
+Each builder (or each human+builder pair) gets its own scoped, expiring identity:
+
+```bash
+node bin/hachiman.js agent add claude-code --allow notes,search --ttl 24
+```
+
+That prints a `sessionToken` (`hsm_…`). Put it into the platform config of Step 3.
+
+### Step 3 — wire the builder into the gateway (per-platform guides)
+
+**Universal bridge block** (the JSON body is the same everywhere — only *where* it lives differs):
+
+```json
+"hachiman-notes": {
+  "command": "node",
+  "args": ["/full/path/to/hachiman-agent/bin/hachiman.js", "bridge", "notes"],
+  "env": {
+    "HACHIMAN_GATEWAY": "http://127.0.0.1:7420",
+    "HACHIMAN_SESSION": "hsm_XXXXXXXXXXXX.XXXXXXXXXXXX"
+  }
+}
+```
+
+**Claude Desktop** — add the block inside `mcpServers` in `claude_desktop_config.json`
+(macOS: `~/Library/Application Support/Claude/`, Windows: `%APPDATA%\Claude\`):
+
+```json
+{ "mcpServers": { "hachiman-notes": { "command": "node", "args": ["/full/path/to/hachiman-agent/bin/hachiman.js", "bridge", "notes"], "env": { "HACHIMAN_GATEWAY": "http://127.0.0.1:7420", "HACHIMAN_SESSION": "hsm_XXXXXXXXXXXX.XXXXXXXXXXXX" } } } }
+```
+
+**Claude Code** — from the repo directory:
+
+```bash
+claude mcp add hachiman-notes \
+  --env HACHIMAN_GATEWAY=http://127.0.0.1:7420 \
+  --env HACHIMAN_SESSION=hsm_XXXXXXXXXXXX.XXXXXXXXXXXX \
+  -- node /full/path/to/hachiman-agent/bin/hachiman.js bridge notes
+```
+
+**Codex CLI** — `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.hachiman_notes]
+command = "node"
+args = ["/full/path/to/hachiman-agent/bin/hachiman.js", "bridge", "notes"]
+
+[mcp_servers.hachiman_notes.env]
+HACHIMAN_GATEWAY = "http://127.0.0.1:7420"
+HACHIMAN_SESSION = "hsm_XXXXXXXXXXXX.XXXXXXXXXXXX"
+```
+
+**Cursor** — Settings → MCP → Add server (or `.cursor/mcp.json` in your project), same JSON block.
+**Windsurf** — Settings → Cascade → MCP servers, same block. **Gemini CLI** —
+`~/.gemini/settings.json`, `mcpServers` key, same block. **GitHub Copilot / VS Code** —
+`.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "hachiman-notes": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/full/path/to/hachiman-agent/bin/hachiman.js", "bridge", "notes"],
+      "env": {
+        "HACHIMAN_GATEWAY": "http://127.0.0.1:7420",
+        "HACHIMAN_SESSION": "hsm_XXXXXXXXXXXX.XXXXXXXXXXXX"
+      }
+    }
+  }
+}
+```
+
+**Hermes / OpenClaw / Qoder / DeepSeek Harness** — two options, both supported:
+
+1. **HTTP endpoint** (when the platform supports MCP-over-HTTP): point it at
+   `http://127.0.0.1:7420/mcp/<server>` and send the header
+   `x-hachiman-session: hsm_XXXXXXXXXXXX.XXXXXXXXXXXX` with each request.
+2. **Stdio bridge** (when the platform spawns MCP subprocesses): register the bridge block above
+   in the platform's MCP config — exactly as for Claude/Cursor.
+
+Full per-platform detail, live-tested examples, and the operator checklist:
+`Hachiman-Agnent-Guide.md` §7–§10.
+
+### Step 4 — verify from inside the builder
+
+Ask the AI builder to call any tool through its new `hachiman-*` server and check:
+
+* the tool executes (ALLOW) — Hachiman logged the decision,
+* the dashboard (`http://127.0.0.1:7420/`, Mission Control) shows the decision with risk/confidence,
+* `node bin/hachiman.js audit --tail 20` shows the append-only audit row.
+
+If a call returns `-32088` (BLOCK) or `-32089` (REVIEW), that's Hachiman working: read the
+`reasons` in the error, or open the dashboard **Advisor**, which maps each reason to its exact fix.
+
+### Step 5 — (optional) offensive skill from inside the builder
+
+If you own the target and have authorized it in writing, the same AI builder can run Hachiman's
+authorized offensive security skill — the builder follows [`skill/SKILL.md`](skill/SKILL.md):
+engagement file → `pentest` → findings → AI Repair Contracts → `retest` until `VERIFIED`.
 
 ---
 
