@@ -27,7 +27,8 @@ export class ResponseEngine {
   onDecision(evt) {
     const { req, verdict } = evt;
     if (verdict.decision !== 'BLOCK') return;
-    const subject = `mcp:${req.mcpId}`;
+    const subject = containmentSubject(req);
+    if (!subject) return; // no addressable subject (e.g. malformed request) — nothing to contain
     const th = this.deps.policyEngine.resolvePolicySet(this.deps.policyPackIds).thresholds.risk;
     const max = this.maxLadder();
 
@@ -63,10 +64,14 @@ export class ResponseEngine {
       record('restrict-capability', { level: 3 });
     }
     if (level >= 4) {
-      // Revoke only grants scoped to the OFFENDING MCP (or wildcard grants).
-      // Never revoke a victim agent's grants for benign MCPs (collateral lockout).
+      // Revoke only grants scoped to the OFFENDING resource (or wildcard grants).
+      // Never revoke a victim agent's grants for benign resources (collateral lockout).
+      const resourceKey = req?.resource?.key || null; // 2.0 universal resource key
       const all = req?.agentId ? this.storage.q.grantActive.all(req.agentId) : [];
-      const offending = all.filter((g) => g.resource === req?.mcpId || g.resource === '*');
+      const offending = all.filter((g) =>
+        (resourceKey && g.resource === resourceKey) ||   // 2.0 plane scope
+        g.resource === req?.mcpId ||                     // legacy MCP scope
+        g.resource === '*');                             // wildcard always covers offending
       for (const g of offending.slice(0, 3)) this.deps.authz.revoke(g.id, 'hachiman:response', cause);
       record('revoke-permission', { level: 4, revoked: offending.length });
     }
@@ -120,4 +125,16 @@ export class ResponseEngine {
   }
 
   recent(n = 50) { return this.actions.slice(-n); }
+}
+
+/**
+ * Derive the containment subject for a request. 2.0 universal requests carry a
+ * resource key (e.g. 'k8s:apps/billing', 'shell:ws-01', 'api:svc'); legacy MCP
+ * requests fall back to 'mcp:<mcpId>'. Returns null when nothing is addressable.
+ */
+export function containmentSubject(req) {
+  if (req?.resource?.key) return req.resource.key;
+  if (req?.gateResource) return req.gateResource;
+  if (req?.mcpId != null) return `mcp:${req.mcpId}`;
+  return null;
 }

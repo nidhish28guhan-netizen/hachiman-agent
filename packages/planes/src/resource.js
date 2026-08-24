@@ -39,6 +39,11 @@ export function universalizeRequest(req) {
   if (!RESOURCE_TYPES.includes(res.type)) throw new Error('resource:type-invalid:' + res.type);
   if (!res.id) throw new Error('resource:id-invalid');
   res.attrs = res.attrs || {};
+  // k8s ids are canonicalized to 'namespace/name' BEFORE the key is built so the
+  // resource key is globally unique and equals the gate resource (no double prefix).
+  if (res.type === 'k8s' && !String(res.id).includes('/')) {
+    res.id = `${res.attrs.namespace || 'default'}/${res.id}`;
+  }
   res.key = resourceKey(res.type, res.id);
 
   const out = { ...req, resource: res };
@@ -61,8 +66,7 @@ export function universalizeRequest(req) {
   if (out.gateResource == null) {
     if (res.type === 'mcp') out.gateResource = res.id;
     else if (res.type === 'api') out.gateResource = `api:${res.id}${res.attrs.path ? ':' + res.attrs.path : ''}`;
-    else if (res.type === 'k8s') out.gateResource = `k8s:${res.attrs.namespace || 'default'}/${res.id}`;
-    else out.gateResource = res.key;
+    else out.gateResource = res.key; // k8s already 'k8s:<ns>/<name>' after canonicalization
   }
   if (!out.agentId && req.subject) out.agentId = req.subject;
   out.ctx = { ...(out.ctx || {}), resourceType: res.type, adapterId: req.adapterId || out.ctx?.adapterId };
